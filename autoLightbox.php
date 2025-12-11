@@ -1,9 +1,9 @@
 <?php
 /*
-Plugin Name: Hello World
-Description: Starter plugin 
-Version: 1.0
-Author: GetSimple CE
+Plugin Name: autoLightbox
+Description: Automatically adds Lightbox to all images
+Version: 2.0
+Author: CE Team
 Author URI: https://www.getsimple-ce.ovh
 */
 
@@ -14,8 +14,8 @@ $thisfile = basename(__FILE__, ".php");
 register_plugin(
 	$thisfile, //Plugin id
 	'autoLightbox', 	//Plugin name
-	'1.0', 		//Plugin version
-	'GetSimple CE',  //Plugin author
+	'2.0', 		//Plugin version
+	'CE Team',  //Plugin author
 	'https://www.getsimple-ce.ovh/', //author website
 	'Automatically adds Lightbox to all images in content areas, gallery plugins not needed.', //Plugin description
 	'plugins', //page type - on which admin tab to display
@@ -26,24 +26,74 @@ register_plugin(
 add_action('theme-header', 'headerLightbox');
 add_action('theme-footer', 'footerLightbox');
 
-
 # functions
-function headerLightbox()
-{
-	global $SITEURL;
+function headerLightbox(){
+	global $SITEURL, $content;
 	echo '<link rel="stylesheet" href="' . $SITEURL . 'plugins/autoLightbox/glightbox/glightbox.min.css">';
 
-
-	global $content;
 	$string = html_entity_decode($content);
-	function wrap_images_in_link($matches)
-	{
-		$img_tag = $matches[0]; // Cały tag <img>
-		preg_match('/src="([^"]+)"/', $img_tag, $src_match); // Wyszukaj src
-		$src_url = $src_match[1]; // Pobierz url z src
-		return '<a href="' . $src_url . '" class="glightbox">' . $img_tag . '</a>'; // Zwróć nowy kod z <a> wokół <img>
+	
+	$dom = new DOMDocument();
+	libxml_use_internal_errors(true); // Suppress HTML5 warnings
+	$dom->loadHTML('<?xml encoding="utf-8" ?>' . $string, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+	libxml_clear_errors();
+	
+	$xpath = new DOMXPath($dom);
+	$images = $xpath->query('//img');
+	
+	foreach ($images as $img) {
+		$classes = $img->getAttribute('class');
+		$excludedClasses = ['nolightbox', 'btn']; // excluded classes
+		$hasExcludedClass = false;
+		
+		foreach ($excludedClasses as $excludedClass) {
+			if (strpos($classes, $excludedClass) !== false) {
+				$hasExcludedClass = true;
+				break;
+			}
+		}
+		
+		if ($hasExcludedClass) {
+			continue; // Skip this image
+		}
+		
+		// Check if image is already inside a clickable element
+		$parent = $img->parentNode;
+		$isInsideClickable = false;
+		
+		while ($parent && $parent->nodeName !== 'body' && $parent->nodeName !== '#document') {
+			$parentTag = strtolower($parent->nodeName);
+			$parentClass = '';
+			
+			if ($parent->hasAttribute('class')) {
+				$parentClass = $parent->getAttribute('class');
+			}
+			
+			// Check if parent is <a>, <button>, or has 'btn' class
+			if ($parentTag === 'a' || $parentTag === 'button' || strpos($parentClass, 'btn') !== false) {
+				$isInsideClickable = true;
+				break;
+			}
+			
+			$parent = $parent->parentNode;
+		}
+		
+		if ($isInsideClickable) {
+			continue; // Skip this image
+		}
+		
+		// Wrap image with lightbox link
+		$link = $dom->createElement('a');
+		$link->setAttribute('href', $img->getAttribute('src'));
+		$link->setAttribute('class', 'glightbox');
+		
+		$imgClone = $img->cloneNode(true);
+		$img->parentNode->replaceChild($link, $img);
+		$link->appendChild($imgClone);
 	}
-	$content = preg_replace_callback('/<img[^>]*src="[^"]+"[^>]*>/', 'wrap_images_in_link', $string);
+	
+	// Save modified HTML
+	$content = $dom->saveHTML();
 }
 
 function footerLightbox()
