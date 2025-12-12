@@ -31,7 +31,8 @@ function headerLightbox(){
 	global $SITEURL, $content;
 	echo '<link rel="stylesheet" href="' . $SITEURL . 'plugins/autoLightbox/glightbox/glightbox.min.css">';
 
-	$string = html_entity_decode($content);
+	//$string = html_entity_decode($content);
+	$string = $content;
 	
 	$dom = new DOMDocument();
 	libxml_use_internal_errors(true); // Suppress HTML5 warnings
