@@ -2,106 +2,74 @@
 /*
 Plugin Name: autoLightbox
 Description: Automatically adds Lightbox to all images
-Version: 2.0
+Version: 2.2
 Author: CE Team
 Author URI: https://www.getsimple-ce.ovh
 */
 
 # get correct id for plugin
 $thisfile = basename(__FILE__, ".php");
-
 # register plugin
 register_plugin(
 	$thisfile, //Plugin id
 	'autoLightbox', 	//Plugin name
-	'2.0', 		//Plugin version
+	'2.2', 		//Plugin version
 	'CE Team',  //Plugin author
 	'https://www.getsimple-ce.ovh/', //author website
 	'Automatically adds Lightbox to all images in content areas, gallery plugins not needed.', //Plugin description
 	'plugins', //page type - on which admin tab to display
-	''  //main function (administration)
+	''  // display main function (admin)
 );
 
 # activate filter 
+add_filter('content', 'processLightbox');
 add_action('theme-header', 'headerLightbox');
 add_action('theme-footer', 'footerLightbox');
 
 # functions
-function headerLightbox(){
-	global $SITEURL, $content;
-	echo '<link rel="stylesheet" href="' . $SITEURL . 'plugins/autoLightbox/glightbox/glightbox.min.css">';
-
-	//$string = html_entity_decode($content);
-	$string = $content;
+function processLightbox($content){
 	
-	$dom = new DOMDocument();
-	libxml_use_internal_errors(true); // Suppress HTML5 warnings
-	$dom->loadHTML('<?xml encoding="utf-8" ?>' . $string, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-	libxml_clear_errors();
-	
-	$xpath = new DOMXPath($dom);
-	$images = $xpath->query('//img');
-	
-	foreach ($images as $img) {
-		$classes = $img->getAttribute('class');
-		$excludedClasses = ['nolightbox', 'btn']; // excluded classes
-		$hasExcludedClass = false;
+	// Simple regex replacement - no decoding at all
+	function wrap_images_in_link($matches) {
+		$img_tag = $matches[0];
 		
-		foreach ($excludedClasses as $excludedClass) {
-			if (strpos($classes, $excludedClass) !== false) {
-				$hasExcludedClass = true;
-				break;
-			}
+		// Check if has excluded class
+		if (preg_match('/class=["\']([^"\']*)\b(nolightbox|btn)\b/i', $img_tag)) {
+			return $img_tag;
 		}
 		
-		if ($hasExcludedClass) {
-			continue; // Skip this image
+		// Extract src
+		if (preg_match('/src=["\']([^"\']+)["\']/i', $img_tag, $src_match)) {
+			$src_url = $src_match[1];
+			return '<a href="' . $src_url . '" class="glightbox">' . $img_tag . '</a>';
 		}
 		
-		// Check if image is already inside a clickable element
-		$parent = $img->parentNode;
-		$isInsideClickable = false;
-		
-		while ($parent && $parent->nodeName !== 'body' && $parent->nodeName !== '#document') {
-			$parentTag = strtolower($parent->nodeName);
-			$parentClass = '';
-			
-			if ($parent->hasAttribute('class')) {
-				$parentClass = $parent->getAttribute('class');
-			}
-			
-			// Check if parent is <a>, <button>, or has 'btn' class
-			if ($parentTag === 'a' || $parentTag === 'button' || strpos($parentClass, 'btn') !== false) {
-				$isInsideClickable = true;
-				break;
-			}
-			
-			$parent = $parent->parentNode;
-		}
-		
-		if ($isInsideClickable) {
-			continue; // Skip this image
-		}
-		
-		// Wrap image with lightbox link
-		$link = $dom->createElement('a');
-		$link->setAttribute('href', $img->getAttribute('src'));
-		$link->setAttribute('class', 'glightbox');
-		
-		$imgClone = $img->cloneNode(true);
-		$img->parentNode->replaceChild($link, $img);
-		$link->appendChild($imgClone);
+		return $img_tag;
 	}
 	
-	// Save modified HTML
-	$content = $dom->saveHTML();
+	// Only wrap images that are NOT already inside <a> or <button> tags
+	// First, wrap all eligible images
+	$content = preg_replace_callback('/<img[^>]+>/i', 'wrap_images_in_link', $content);
+	
+	// Then unwrap those inside <a> tags
+	$content = preg_replace('/<a([^>]*)>\s*<a href="[^"]*" class="glightbox">(<img[^>]*>)<\/a>\s*<\/a>/i', '<a$1>$2</a>', $content);
+	
+	// Unwrap those inside <button> tags
+	$content = preg_replace('/<button([^>]*)>\s*<a href="[^"]*" class="glightbox">(<img[^>]*>)<\/a>\s*<\/button>/i', '<button$1>$2</button>', $content);
+	
+	return $content;
+}
+
+function headerLightbox()
+{
+	global $SITEURL;
+	echo '<link rel="stylesheet" href="' . $SITEURL . 'plugins/autoLightbox/glightbox/glightbox.min.css">';
 }
 
 function footerLightbox()
 {
-	global $GSPLUGINPATH;
+	global $SITEURL;
 	echo '<script src="' . $SITEURL . 'plugins/autoLightbox/glightbox/glightbox.min.js"></script>';
-
 	echo "
 <script type='text/javascript'>
 const lightbox = GLightbox({
@@ -112,5 +80,4 @@ const lightbox = GLightbox({
 </script>
 ";
 }
-
 ?>
