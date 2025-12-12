@@ -2,7 +2,7 @@
 /*
 Plugin Name: autoLightbox
 Description: Automatically adds Lightbox to all images
-Version: 2.0
+Version: 2.1
 Author: CE Team
 Author URI: https://www.getsimple-ce.ovh
 */
@@ -14,7 +14,7 @@ $thisfile = basename(__FILE__, ".php");
 register_plugin(
 	$thisfile, //Plugin id
 	'autoLightbox', 	//Plugin name
-	'2.0', 		//Plugin version
+	'2.1', 		//Plugin version
 	'CE Team',  //Plugin author
 	'https://www.getsimple-ce.ovh/', //author website
 	'Automatically adds Lightbox to all images in content areas, gallery plugins not needed.', //Plugin description
